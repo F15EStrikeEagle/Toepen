@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Avoid 15 — Multiplayer Points Game</title>
+  <style>
+    :root{
+      --bg:#0f1724; --card:#0b1220; --accent:#06b6d4; --muted:#94a3b8; --danger:#ef4444;
+      --rounded:14px;
+    }
+    *{box-sizing:border-box;font-family:Inter, system-ui, Arial, sans-serif}
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,#071023 0%, #081426 100%);color:#e6eef6}
+    .wrap{max-width:980px;margin:18px auto;padding:14px}
+    header{display:flex;gap:12px;align-items:center;justify-content:space-between}
+    h1{font-size:18px;margin:0}
+    p.lead{margin:6px 0 12px;color:var(--muted);font-size:13px}
+
+    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.04));padding:12px;border-radius:var(--rounded);box-shadow:0 6px 18px rgba(2,6,23,0.6)}
+
+    .player-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+    .player{padding:12px;border-radius:12px;background:rgba(255,255,255,0.02);display:flex;flex-direction:column;align-items:stretch;gap:8px}
+    .player .top{display:flex;gap:8px;align-items:center}
+    .avatar{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;font-weight:700}
+    .name{flex:1}
+    .name input{width:100%;padding:8px;border-radius:8px;border:0;background:transparent;color:inherit;font-size:16px}
+    .score{font-size:36px;font-weight:700;text-align:center}
+    .buttons{display:flex;gap:8px;justify-content:center}
+    button{border:0;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,0.04);color:inherit;font-weight:700}
+    button.big{padding:14px 18px;font-size:16px}
+    button.primary{background:linear-gradient(90deg,var(--accent),#7c3aed);color:#031124}
+    button.danger{background:linear-gradient(90deg,#ff6b6b,#ef4444);color:white}
+    .small{padding:6px 8px;font-size:13px}
+
+    footer{margin-top:16px;color:var(--muted);font-size:13px}
+
+    /* Modal / losing screen */
+    .overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(1,6,10,0.6);z-index:40}
+    .overlay.show{display:flex}
+    .modal{background:linear-gradient(180deg,#052033,#01202b);padding:22px;border-radius:18px;text-align:center;max-width:420px}
+    .modal h2{margin:6px 0 0}
+    .modal p{color:var(--muted)}
+
+    /* responsive touch tweaks */
+    @media (max-width:520px){
+      .avatar{width:40px;height:40px}
+      .score{font-size:30px}
+      button{padding:12px}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Avoid 15 — Multiplayer Points Game</h1>
+        <p class="lead">Add up to 8 players. First player to reach 15 points <strong>loses</strong>. Works on touchscreen / mobile.</p>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <label style="font-size:13px;color:var(--muted)">Players:</label>
+        <select id="playerCount" class="card" style="padding:6px;border-radius:10px">
+          <option>2</option>
+          <option>3</option>
+          <option>4</option>
+          <option>5</option>
+          <option>6</option>
+          <option>7</option>
+          <option selected>8</option>
+        </select>
+      </div>
+    </header>
+
+    <div class="controls">
+      <button id="resetNames" class="small">Reset Names</button>
+      <button id="resetScores" class="small">Reset Scores</button>
+      <button id="randomize" class="small">Randomize Scores</button>
+      <div style="flex:1"></div>
+      <div style="display:flex;gap:8px">
+        <button id="decreaseTarget" class="small">-</button>
+        <div class="card" style="padding:8px;border-radius:10px;display:flex;align-items:center;gap:8px">Target (lose at): <input id="targetInput" type="number" min="1" value="15" style="width:56px;background:transparent;border:0;color:var(--muted);text-align:center;margin-left:6px"/></div>
+        <button id="increaseTarget" class="small">+</button>
+      </div>
+    </div>
+
+    <div id="players" class="player-grid"></div>
+
+    <footer>Tap the + to add a point, - to remove. When someone reaches the target they lose and you get a losing screen.</footer>
+  </div>
+
+  <div id="overlay" class="overlay" role="dialog" aria-modal="true">
+    <div class="modal">
+      <div style="font-size:40px">💥</div>
+      <h2 id="loserTitle">Player X lost</h2>
+      <p id="loserText">They reached the losing score.</p>
+      <div style="display:flex;gap:8px;margin-top:12px;justify-content:center">
+        <button id="continueBtn" class="primary">Continue (keep scores)</button>
+        <button id="restartBtn" class="danger">Restart (reset scores)</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Simple single-file app. No dependencies.
+    const MAX_PLAYERS = 8;
+    const playersEl = document.getElementById('players');
+    const playerCountSelect = document.getElementById('playerCount');
+    const resetNamesBtn = document.getElementById('resetNames');
+    const resetScoresBtn = document.getElementById('resetScores');
+    const randomizeBtn = document.getElementById('randomize');
+    const overlay = document.getElementById('overlay');
+    const loserTitle = document.getElementById('loserTitle');
+    const loserText = document.getElementById('loserText');
+    const continueBtn = document.getElementById('continueBtn');
+    const restartBtn = document.getElementById('restartBtn');
+    const targetInput = document.getElementById('targetInput');
+    const decreaseTarget = document.getElementById('decreaseTarget');
+    const increaseTarget = document.getElementById('increaseTarget');
+
+    // state
+    let state = {
+      count: parseInt(playerCountSelect.value,10),
+      target: parseInt(targetInput.value,10),
+      players: []
+    };
+
+    // load from localStorage if available
+    const STORAGE_KEY = 'avoid15_state_v1';
+    function load() {
+      try{
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if(raw){
+          const parsed = JSON.parse(raw);
+          // validate
+          if(parsed && Array.isArray(parsed.players)){
+            state = Object.assign(state, parsed);
+            // clamp
+            state.count = Math.max(2, Math.min(MAX_PLAYERS, state.count || 2));
+            state.target = Math.max(1, state.target || 15);
+            return;
+          }
+        }
+      }catch(e){console.warn(e)}
+    }
+    function save(){
+      try{localStorage.setItem(STORAGE_KEY, JSON.stringify(state));}catch(e){console.warn(e)}
+    }
+
+    function makeDefaultPlayers(n){
+      const arr = [];
+      for(let i=1;i<=n;i++) arr.push({id:i, name:`Player ${i}`, score:0});
+      return arr;
+    }
+
+    load();
+    if(!state.players || state.players.length < 2){
+      state.players = makeDefaultPlayers(state.count);
+    }
+
+    // ensure players length matches count
+    function ensurePlayers(){
+      while(state.players.length < state.count){
+        const id = state.players.length+1;
+        state.players.push({id:id, name:`Player ${id}`, score:0});
+      }
+      while(state.players.length > state.count){
+        state.players.pop();
+      }
+    }
+
+    function render(){
+      ensurePlayers();
+      playersEl.innerHTML = '';
+      playerCountSelect.value = state.count;
+      targetInput.value = state.target;
+
+      state.players.forEach((p, idx) => {
+        const div = document.createElement('div');
+        div.className = 'player card';
+        div.innerHTML = `
+          <div class="top">
+            <div class="avatar">${String(p.name||'').trim().charAt(0).toUpperCase() || (idx+1)}</div>
+            <div class="name"><input aria-label="player-name-${idx}" data-index="${idx}" value="${escapeHtml(p.name)}"/></div>
+            <div style="text-align:right;color:var(--muted);font-size:12px">#${idx+1}</div>
+          </div>
+          <div class="score">${p.score}</div>
+          <div class="buttons">
+            <button class="small" data-action="add" data-index="${idx}">+1</button>
+            <button class="small" data-action="add5" data-index="${idx}">+5</button>
+            <button class="small" data-action="sub" data-index="${idx}">-1</button>
+            <button class="small" data-action="set0" data-index="${idx}">Reset</button>
+          </div>
+        `;
+        // attach events
+        const input = div.querySelector('input');
+        input.addEventListener('input', (e)=>{
+          const i = Number(e.target.dataset.index);
+          state.players[i].name = e.target.value || `Player ${i+1}`;
+          save();
+          render();
+        });
+        div.querySelectorAll('button').forEach(btn=>{
+          btn.addEventListener('click', (e)=>{
+            const idx = Number(btn.dataset.index);
+            const action = btn.dataset.action;
+            if(action === 'add') addPoints(idx,1);
+            if(action === 'add5') addPoints(idx,5);
+            if(action === 'sub') addPoints(idx,-1);
+            if(action === 'set0') { state.players[idx].score = 0; save(); render(); }
+          });
+        });
+        playersEl.appendChild(div);
+      });
+    }
+
+    function addPoints(idx, delta){
+      state.players[idx].score = Math.max(0, (state.players[idx].score||0) + delta);
+      save();
+      render();
+      // check lose condition
+      if(state.players[idx].score >= state.target){
+        showLoser(state.players[idx]);
+      }
+    }
+
+    function showLoser(player){
+      loserTitle.textContent = `${player.name} lost`;
+      loserText.textContent = `Reached ${player.score} points (target ${state.target}).`;
+      overlay.classList.add('show');
+    }
+
+    continueBtn.addEventListener('click', ()=>{ overlay.classList.remove('show'); });
+    restartBtn.addEventListener('click', ()=>{
+      state.players.forEach(p=>p.score = 0);
+      save(); render(); overlay.classList.remove('show');
+    });
+
+    resetNamesBtn.addEventListener('click', ()=>{
+      state.players = state.players.map((p,i)=>({id:i+1,name:`Player ${i+1}`,score:p.score||0}));
+      save(); render();
+    });
+    resetScoresBtn.addEventListener('click', ()=>{
+      state.players.forEach(p=>p.score=0); save(); render();
+    });
+    randomizeBtn.addEventListener('click', ()=>{
+      state.players.forEach(p=>p.score = Math.floor(Math.random()*Math.max(1,state.target)) ); save(); render();
+    });
+
+    playerCountSelect.addEventListener('change', ()=>{
+      state.count = Math.max(2, Math.min(MAX_PLAYERS, Number(playerCountSelect.value)||2));
+      // if more players needed, add defaults
+      ensurePlayers();
+      save(); render();
+    });
+
+    targetInput.addEventListener('change', ()=>{
+      const v = Math.max(1, Math.floor(Number(targetInput.value)||15));
+      state.target = v; save(); render();
+    });
+    decreaseTarget.addEventListener('click', ()=>{ targetInput.stepDown(); targetInput.dispatchEvent(new Event('change')); });
+    increaseTarget.addEventListener('click', ()=>{ targetInput.stepUp(); targetInput.dispatchEvent(new Event('change')); });
+
+    // utility
+    function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    // touch: make buttons big & friendly — also allow longpress to add 3 points
+    let longPressTimer = null;
+    playersEl.addEventListener('touchstart', (e)=>{
+      const t = e.target.closest('button');
+      if(!t) return;
+      longPressTimer = setTimeout(()=>{
+        // find index and add +3 if primary add
+        const idx = Number(t.dataset.index);
+        if(t.dataset.action === 'add') addPoints(idx,3);
+      }, 600);
+    });
+    playersEl.addEventListener('touchend', ()=>{ if(longPressTimer) clearTimeout(longPressTimer); });
+
+    // initial render
+    render();
+  </script>
+</body>
+</html>
