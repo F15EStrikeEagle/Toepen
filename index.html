@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Toepen</title>
+  <title>Avoid 15 — Multiplayer Points Game</title>
   <style>
     :root{
       --bg:#0f1724; --card:#0b1220; --accent:#06b6d4; --muted:#94a3b8; --danger:#ef4444;
@@ -55,7 +55,7 @@
     <header>
       <div>
         <h1>Avoid 15 — Multiplayer Points Game</h1>
-        <p class="lead">Add up to 8 players. First player to reach 15 points <strong>loses</strong>. </p>
+        <p class="lead">Add up to 8 players. First player to reach 15 points <strong>loses</strong>. Works on touchscreen / mobile.</p>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         <label style="font-size:13px;color:var(--muted)">Players:</label>
@@ -186,7 +186,7 @@
           <div class="score">${p.score}</div>
           <div class="buttons">
             <button class="small" data-action="add" data-index="${idx}">+1</button>
-            <button class="small" data-action="add3" data-index="${idx}">+3</button>
+            <button class="small" data-action="add5" data-index="${idx}">+5</button>
             <button class="small" data-action="sub" data-index="${idx}">-1</button>
             <button class="small" data-action="set0" data-index="${idx}">Reset</button>
           </div>
